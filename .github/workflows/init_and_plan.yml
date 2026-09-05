@@ -15,8 +15,6 @@ on:
     secrets:
       AZURE_CLIENT_ID:
         required: true
-      AZURE_CLIENT_SECRET:
-        required: true
       AZURE_TENANT_ID:
         required: true
       AZURE_SUBSCRIPTION_ID:
@@ -29,7 +27,6 @@ permissions:
 env:
   ARM_USE_OIDC: true
   ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-  ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
   ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
   ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
   TF_VAR_subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
