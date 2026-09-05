@@ -1,0 +1,34 @@
+name: Terraform Format Check
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  terraform-format-check:
+    name: "Terraform Format Check"
+    runs-on: ubuntu-latest
+    if: github.ref_name == 'main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: latest
+          
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: latest
+
+      - name: Terraform Format Check
+        run: |
+          terraform fmt -check -recursive
+      
+      - name: Report Formatting Issues
+        if: failure()
+        run: echo "Terraform formatting issues detected. Please run 'terraform fmt -recursive' to correct."

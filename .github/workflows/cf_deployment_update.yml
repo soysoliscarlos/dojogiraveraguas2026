@@ -1,0 +1,35 @@
+name: 'Infrastructure Deployment'
+
+on:
+  ### Descomenta el disparador «push» si quieres que la 
+  ### implementación se realice automáticamente cuando se 
+  ### envíen cambios a la rama principal.
+  # push:
+  #   branches:
+  #     - main
+  workflow_dispatch:
+
+run-name: Deploying branch ${{ github.ref_name }}
+permissions:
+  id-token: write
+  contents: read
+  actions: write
+
+jobs:
+  
+  terraform-plan: 
+    if: github.ref_name == 'main'
+    uses: ./.github/workflows/init_and_plan.yml
+    with:
+      directory: ./terraform
+      environment: ${{ github.ref_name == 'main' && 'prod' || github.ref_name }}
+    secrets: inherit
+
+  terraform-apply:
+    needs: terraform-plan
+    if: github.ref_name == 'main' && needs.terraform-plan.result == 'success'
+    uses: ./.github/workflows/init_and_apply.yml
+    with:
+      directory: ./terraform
+      environment: ${{ github.ref_name == 'main' && 'prod' || github.ref_name }}
+    secrets: inherit

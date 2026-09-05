@@ -1,0 +1,85 @@
+name: 'Terraform Init and Plan'
+
+on:
+  workflow_call:
+    inputs:
+      directory:
+        description: "Working directory name"
+        type: string
+        required: true
+
+      environment:
+        description: "Target Environment"
+        type: string
+        required: true
+    secrets:
+      AZURE_CLIENT_ID:
+        required: true
+      AZURE_CLIENT_SECRET:
+        required: true
+      AZURE_TENANT_ID:
+        required: true
+      AZURE_SUBSCRIPTION_ID:
+        required: true
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  ARM_USE_OIDC: true
+  ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+  ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+  ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  TF_VAR_subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+jobs:
+  init-and-plan: 
+    name: 'Plan'
+    runs-on: ubuntu-latest
+    if: github.ref_name == 'main'
+  
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate input directory
+        run: |
+          if [ -d ${{ inputs.directory }} ]; then
+            echo "Directory exists"
+          else 
+            echo "Directory does not exist."
+            exit 1
+          fi
+
+      - name: Set Github URL
+        run: git config --global url."https://oauth2:${{ secrets.GITHUB_TOKEN }}@github.com".insteadOf https://github.com
+
+      - name: Azure CLI Login (Service Principal)
+        run: |
+          az login --service-principal -u "$AZURE_CLIENT_ID" -p "$AZURE_CLIENT_SECRET" --tenant "$AZURE_TENANT_ID"
+          az account set --subscription "$AZURE_SUBSCRIPTION_ID"
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: latest
+          
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: latest
+
+      - name: Terraform Init
+        run: terraform init
+        working-directory: ${{ inputs.directory }}
+
+      - name: Terraform Validate
+        run: terraform validate
+        working-directory: ${{ inputs.directory }}
+
+      - name: Terraform Plan        
+        run: terraform plan -input=false -var-file="terraform.tfvars"
+        working-directory: ${{ inputs.directory }}
+      

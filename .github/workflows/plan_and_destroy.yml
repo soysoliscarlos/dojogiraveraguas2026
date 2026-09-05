@@ -1,0 +1,124 @@
+name: 'Terraform Plan and Destroy'
+
+on:
+  workflow_call:
+    inputs:
+      directory:
+        description: "Working directory name"
+        type: string
+        required: true
+
+      environment:
+        description: "Target Environment"
+        type: string
+        required: true
+    secrets:
+      AZURE_CLIENT_ID:
+        required: true
+      AZURE_TENANT_ID:
+        required: true
+      AZURE_SUBSCRIPTION_ID:
+        required: true
+        
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  ARM_USE_OIDC: true
+  ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+  ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+jobs:
+  init-and-plan: 
+    name: 'Plan'
+    runs-on: ubuntu-latest
+    if: github.ref_name == 'main'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate input directory
+        run: |
+          if [ -d ${{ inputs.directory }} ]; then
+            echo "Directory exists"
+          else 
+            echo "Directory does not exist."
+            exit 1
+          fi
+
+      - name: Set Github URL
+        run: git config --global url."https://oauth2:${{ secrets.GITHUB_TOKEN }}@github.com".insteadOf https://github.com
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: latest
+
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: latest
+
+      - name: Terraform Init
+        run: terraform init
+        working-directory: ${{ inputs.directory }}
+
+      - name: Terraform Validate
+        run: terraform validate
+        working-directory: ${{ inputs.directory }}
+
+      - name: Terraform Plan        
+        run: terraform plan -input=false -var-file="terraform.tfvars" -destroy
+        working-directory: ${{ inputs.directory }}
+
+  approval:
+    name: 'Approval'
+    if: github.ref_name == 'main'
+    runs-on: ubuntu-latest
+    environment: approval
+    needs: init-and-plan
+    steps:
+      - name: Approval Step
+        run: echo "${{ github.event.review.state }}"
+
+  
+  destroy: 
+    name: 'Destroy'
+    runs-on: ubuntu-latest
+    needs: approval
+    if: needs.approval.result == 'success'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set Github URL
+        run: git config --global url."https://oauth2:${{ secrets.GITHUB_TOKEN }}@github.com".insteadOf https://github.com
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: latest
+          
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: latest
+             
+      - name: Terraform Init
+        run: terraform init
+        working-directory: ${{ inputs.directory }}
+        
+      - name: Terraform Destroy
+        run: terraform destroy -var-file="terraform.tfvars" -auto-approve
+        working-directory: ${{ inputs.directory }}      
