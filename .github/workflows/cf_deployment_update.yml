@@ -13,7 +13,6 @@ run-name: Deploying branch ${{ github.ref_name }}
 permissions:
   id-token: write
   contents: read
-  actions: write
 
 jobs:
   
