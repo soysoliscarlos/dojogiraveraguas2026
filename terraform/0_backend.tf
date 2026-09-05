@@ -7,6 +7,7 @@ terraform {
     container_name       = "tfstate-user1"
     key                  = "terraform.tfstate"
     use_oidc             = true
+    use_azuread_auth     = true # evita listKeys, usa RBAC (Storage Blob Data Contributor) vía OIDC
   }
 
   required_providers {
